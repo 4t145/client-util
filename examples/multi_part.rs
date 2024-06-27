@@ -2,10 +2,13 @@ use client_util::prelude::*;
 
 #[tokio::main]
 async fn main() -> client_util::Result<()> {
+    let form = Form::new()
+        .text("key", "value")
+        .part("file", Part::bytes(b"hello, world!"));
     let mut client = client_util::client::hyper_tls_client();
-    let request = http::Request::get("https://httpbin.org/json")
+    let request = http::Request::post("https://httpbin.org/anything")
         .version(http::Version::HTTP_11)
-        .empty()?;
+        .multipart(form)?;
     let (parts, response) = request
         .send(&mut client)
         .await?
@@ -13,11 +16,7 @@ async fn main() -> client_util::Result<()> {
         .await?
         .into_parts();
     println!("{:?}", parts);
-    println!("{:?}", response);
-    let request = http::Request::post("https://httpbin.org/json")
-        .json(&serde_json::json!({"key": "value"}))?;
-    let response = request.send(&mut client).await?;
+    println!("{}", serde_json::to_string_pretty(&response).unwrap());
 
-    println!("{:?}", response);
     Ok(())
 }

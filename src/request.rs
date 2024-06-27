@@ -1,9 +1,13 @@
+#[cfg(feature = "multipart")]
+mod multipart;
 use bytes::Bytes;
 use http::request::Builder;
 use http::Request;
 use http::Response;
 use http::{header::CONTENT_TYPE, Uri};
 use http::{uri::Scheme, HeaderValue};
+#[cfg(feature = "multipart")]
+pub use multipart::*;
 use std::future::Future;
 
 #[cfg(feature = "serde")]
@@ -26,6 +30,10 @@ pub trait RequestExt<B> {
     fn json<T: Serialize + ?Sized>(self, body: &T) -> crate::Result<Request<crate::Body>>;
     #[cfg(feature = "query")]
     fn query<Q: Serialize + ?Sized>(self, query: &Q) -> crate::Result<Request<B>>;
+    #[cfg(feature = "multipart")]
+    fn multipart(self, form: multipart::Form) -> crate::Result<Request<crate::Body>>;
+    #[cfg(feature = "form")]
+    fn form<T: Serialize + ?Sized>(self, form: &T) -> crate::Result<Request<crate::Body>>;
     fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<crate::Body>>;
     fn empty(self) -> crate::Result<Request<crate::Body>>;
     fn with_version(self, version: http::Version) -> crate::Result<Request<B>>;
@@ -80,19 +88,35 @@ impl RequestExt<()> for Builder {
         req.json(body)
     }
 
-    fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<crate::Body>> {
-        let req = self
-            .body(())
-            .map_err(crate::Error::with_context("build request body"))?;
-        req.plain_text(body)
-    }
-
     #[cfg(feature = "query")]
     fn query<Q: Serialize + ?Sized>(self, query: &Q) -> crate::Result<Request<()>> {
         let req = self
             .body(())
             .map_err(crate::Error::with_context("build request body"))?;
         req.query(query)
+    }
+
+    #[cfg(feature = "multipart")]
+    fn multipart(self, form: multipart::Form) -> crate::Result<Request<crate::Body>> {
+        let req = self
+            .body(())
+            .map_err(crate::Error::with_context("build request body"))?;
+        req.multipart(form)
+    }
+
+    #[cfg(feature = "form")]
+    fn form<T: Serialize + ?Sized>(self, form: &T) -> crate::Result<Request<crate::Body>> {
+        let req = self
+            .body(())
+            .map_err(crate::Error::with_context("build request body"))?;
+        req.form(form)
+    }
+
+    fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<crate::Body>> {
+        let req = self
+            .body(())
+            .map_err(crate::Error::with_context("build request body"))?;
+        req.plain_text(body)
     }
 
     fn empty(self) -> crate::Result<Request<crate::Body>> {
@@ -166,18 +190,7 @@ where
         let request = Request::from_parts(parts, full(json_body));
         Ok(request)
     }
-    fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<crate::Body>> {
-        let (mut parts, _) = self.into_parts();
-        parts.headers.insert(
-            CONTENT_TYPE,
-            HeaderValue::from_static(mime::TEXT_PLAIN_UTF_8.as_ref()),
-        );
-        Ok(Request::from_parts(parts, full(body)))
-    }
-    fn empty(self) -> crate::Result<Request<crate::Body>> {
-        let (parts, _) = self.into_parts();
-        Ok(Request::from_parts(parts, empty()))
-    }
+
     #[cfg(feature = "query")]
     fn query<Q: Serialize + ?Sized>(self, query: &Q) -> crate::Result<Request<B>> {
         use http::uri::PathAndQuery;
@@ -212,6 +225,55 @@ where
         };
         parts.uri = new_uri;
         Ok(Request::from_parts(parts, body))
+    }
+
+    #[cfg(feature = "multipart")]
+    fn multipart(self, mut form: multipart::Form) -> crate::Result<Request<crate::Body>> {
+        let (mut parts, _) = self.into_parts();
+        let boundary = form.boundary();
+        parts.headers.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_str(&format!(
+                "{}; boundary={}",
+                mime::MULTIPART_FORM_DATA,
+                boundary
+            ))
+            .map_err(crate::Error::with_context("build content type header"))?,
+        );
+        if let Some(length) = form.compute_length() {
+            parts.headers.insert(
+                http::header::CONTENT_LENGTH,
+                HeaderValue::from_str(&length.to_string())
+                    .map_err(crate::Error::with_context("build content length header"))?,
+            );
+        }
+        let body = form.stream();
+        Ok(Request::from_parts(parts, body))
+    }
+
+    #[cfg(feature = "form")]
+    fn form<T: Serialize + ?Sized>(self, form: &T) -> crate::Result<Request<crate::Body>> {
+        let (mut parts, _) = self.into_parts();
+        let body = serde_urlencoded::to_string(form)
+            .map_err(crate::Error::with_context("serialize form"))?;
+        parts.headers.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_static(mime::APPLICATION_WWW_FORM_URLENCODED.as_ref()),
+        );
+        Ok(Request::from_parts(parts, full(body)))
+    }
+
+    fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<crate::Body>> {
+        let (mut parts, _) = self.into_parts();
+        parts.headers.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_static(mime::TEXT_PLAIN_UTF_8.as_ref()),
+        );
+        Ok(Request::from_parts(parts, full(body)))
+    }
+    fn empty(self) -> crate::Result<Request<crate::Body>> {
+        let (parts, _) = self.into_parts();
+        Ok(Request::from_parts(parts, empty()))
     }
 
     fn with_version(mut self, version: http::Version) -> crate::Result<Request<B>> {

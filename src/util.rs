@@ -28,3 +28,15 @@ where
     header.set_sensitive(true);
     header
 }
+
+pub fn simple_rand() -> u64 {
+    use std::time::SystemTime;
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("system time is always after epoch")
+        .as_nanos();
+    use std::hash::{DefaultHasher, Hasher};
+    let mut hasher = DefaultHasher::new();
+    hasher.write_u128(timestamp);
+    hasher.finish()
+}

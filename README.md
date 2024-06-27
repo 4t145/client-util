@@ -4,8 +4,9 @@ Help you to make your own http client. At least this crate can help you to use h
 
 
 ## Todo
-- [ ] form
+- [x] form
 - [ ] cookie jar
 - [ ] tests
 - [ ] websocket
 - [ ] stream
+- [ ] typed body and async clone

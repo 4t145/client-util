@@ -1,5 +1,7 @@
 use std::{borrow::Cow, fmt};
 
+use tower_http::BoxError;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -104,6 +106,9 @@ error_kinds! {
         SerdeUrlencoded(serde_urlencoded::ser::Error),
         #[cfg(feature = "client-hyper")]
         ClientHyper(hyper_util::client::legacy::Error),
+        MimeParse(mime::FromStrError),
+        InvalidHeaderValue(http::header::InvalidHeaderValue),
+        Body(BoxError),
     }
 }
 
