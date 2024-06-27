@@ -10,10 +10,11 @@ pub use http::response::Builder;
 pub use http::response::Response;
 use http::HeaderValue;
 use http_body_util::BodyExt;
-use hyper::body::Buf;
+#[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::str::FromStr;
-pub trait RequestExt {
+pub trait ResponseExt {
+    #[cfg(feature = "json")]
     fn json<T: DeserializeOwned>(self) -> impl Future<Output = crate::Result<Response<T>>> + Send;
     fn text(self) -> impl Future<Output = crate::Result<Response<String>>> + Send;
 }
@@ -33,13 +34,15 @@ impl Decoders {
     }
 }
 
-impl<B> RequestExt for Response<B>
+impl<B> ResponseExt for Response<B>
 where
-    B: hyper::body::Body + Send,
+    B: http_body::Body + Send,
     B::Data: Send,
     B::Error: std::error::Error + Send + 'static,
 {
+    #[cfg(feature = "json")]
     async fn json<T: DeserializeOwned>(self) -> crate::Result<Response<T>> {
+        use bytes::Buf;
         let (parts, body) = self.into_parts();
         let body = body
             .collect()

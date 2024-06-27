@@ -1,0 +1,10 @@
+{
+    "cSpell.words": [
+        "NISTP",
+        "PKCS",
+        "rustls"
+    ],
+    "rust-analyzer.cargo.features": [
+        "json"
+    ]
+}
