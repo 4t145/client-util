@@ -8,6 +8,7 @@ async fn main() -> client_util::Result<()> {
     let mut client = client_util::client::hyper_tls_client();
     let request = http::Request::post("https://httpbin.org/anything")
         .version(http::Version::HTTP_11)
+        .body(())?
         .multipart(form)?;
     let (parts, response) = request
         .send(&mut client)

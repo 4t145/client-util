@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use client_util::prelude::*;
 
 #[tokio::main]
@@ -15,9 +17,13 @@ async fn main() -> client_util::Result<()> {
     println!("{:?}", parts);
     println!("{:?}", response);
     let request = http::Request::post("https://httpbin.org/json")
+        .body(())?
         .json(&serde_json::json!({"key": "value"}))?;
-    let response = request.send(&mut client).await?;
-
+    let response = request
+        .send_timeout(&mut client, Duration::from_millis(1))
+        .await?
+        .bytes()
+        .await?;
     println!("{:?}", response);
     Ok(())
 }

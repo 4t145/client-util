@@ -5,8 +5,16 @@ edition = "2021"
 
 [dependencies]
 
+# Http essentials
 http = "1"
 http-body-util = "0.1"
+tower-service = "0.3"
+http-body = "1"
+bytes = "1.6"
+mime = "0.3"
+
+# Extension layer
+tower-http = { version = "0.5", features = ["timeout"] }
 
 # Hyper client
 hyper = { version = "1.3", features = ["client"], optional = true }
@@ -18,10 +26,8 @@ hyper-util = { version = "0.1", features = [
 ], optional = true }
 
 # TLS support
-hyper-rustls = { version = "0.27.2", features = ["http2"], optional = true }
+hyper-rustls = { version = "0.27", features = ["http2"], optional = true }
 rustls = { version = "0.23", optional = true }
-
-mime = "0.3"
 
 # Serde support
 serde = { version = "1", optional = true }
@@ -35,16 +41,17 @@ serde_urlencoded = { version = "0.7", optional = true }
 # Auth
 base64 = { version = "0.22", optional = true }
 
-tower-http = { version = "0.5", features = ["timeout"] }
-tower-service = "0.3"
-http-body = "1"
-bytes = "1.6"
+# Form
 percent-encoding = { version = "2.3", optional = true }
+
+# Stream
 futures-core = { version = "0.3", optional = true }
 futures-util = { version = "0.3", optional = true }
+pin-project-lite = "0.2.14"
+tower = { version = "0.4.13", features = ["util"] }
 
 [features]
-default = ["client-hyper", "tls", "multipart", "form"]
+default = ["client-hyper", "tls", "json", "query", "decompression-all"]
 
 futures-util = ["dep:futures-util"]
 futures-core = ["dep:futures-core"]
@@ -56,7 +63,7 @@ serde = ["dep:serde"]
 serde_json = ["dep:serde_json", "serde"]
 serde_urlencoded = ["dep:serde_urlencoded", "serde"]
 base64 = ["dep:base64"]
-
+stream = ["futures-core", "futures-util"]
 client-hyper = ["hyper", "hyper-util"]
 tls = ["hyper-rustls", "rustls"]
 
@@ -67,17 +74,45 @@ json = ["serde_json"]
 query = ["serde_urlencoded"]
 
 # multipart support
-multipart = ["percent-encoding", "futures-util", "futures-core"]
+multipart = ["percent-encoding", "stream"]
 
 # basic auth support
-basic-auth = ["base64"]
+auth = ["base64"]
 percent-encoding = ["dep:percent-encoding"]
 form = ["serde_urlencoded"]
 
+# decompression support
+decompression-all = [
+    "decompression-deflate",
+    "decompression-gzip",
+    "decompression-br",
+    "decompression-zstd",
+]
+decompression-deflate = ["tower-http/decompression-deflate"]
+decompression-gzip = ["tower-http/decompression-gzip"]
+decompression-br = ["tower-http/decompression-br"]
+decompression-zstd = ["tower-http/decompression-zstd"]
+
+# full
+full = ["client-hyper", "tls", "form", "json", "query", "auth", "multipart"]
+
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
-
+serde = { version = "1", features = ["derive"] }
+hyper = { version = "1.3", features = ["server", "client"] }
+hyper-util = { version = "0.1", features = [
+    "server",
+    "client",
+    "http1",
+    "http2",
+    "client-legacy",
+] }
 [[example]]
 name = "json"
 path = "examples/json.rs"
 required-features = ["json"]
+
+[[example]]
+name = "multipart"
+path = "examples/multi_part.rs"
+required-features = ["multipart"]

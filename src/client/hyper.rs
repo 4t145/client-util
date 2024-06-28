@@ -1,16 +1,16 @@
 pub use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::{connect::Connect, Client};
 
-type HyperClient = Client<HttpConnector, crate::Body>;
+type HyperClient = Client<HttpConnector, crate::DynBody>;
 
-pub fn build_hyper_client_with_connector<C>(connector: C) -> Client<C, crate::Body>
+pub fn build_hyper_client_with_connector<C>(connector: C) -> Client<C, crate::DynBody>
 where
     C: Connect + Clone,
 {
     use hyper_util::client::legacy::Builder;
     use hyper_util::rt::TokioExecutor;
     let builder = Builder::new(TokioExecutor::new());
-    builder.build::<_, crate::Body>(connector)
+    builder.build::<_, crate::DynBody>(connector)
 }
 
 pub fn build_hyper_client() -> HyperClient {
@@ -82,7 +82,7 @@ mod tls {
     }
     use super::build_hyper_client_with_connector;
 
-    type HyperTlsClient = Client<HttpsConnector<HttpConnector>, crate::Body>;
+    type HyperTlsClient = Client<HttpsConnector<HttpConnector>, crate::DynBody>;
 
     pub fn build_connector_with_tls_config(
         tls_config: rustls::ClientConfig,

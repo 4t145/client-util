@@ -15,12 +15,13 @@ use http_body::Frame;
 use mime::Mime;
 use percent_encoding::{self, AsciiSet, NON_ALPHANUMERIC};
 
-use crate::body::{empty, full, stream, Body};
+use crate::body::{empty, full, stream, DynBody};
+use crate::error::BodyError;
+use crate::util::never;
 use futures_core::Stream;
 use futures_util::{future, stream, StreamExt};
 use http::HeaderMap;
-use http_body_util::BodyStream;
-use tower_http::BoxError;
+use http_body_util::{BodyExt, BodyStream};
 
 /// An async multipart/form-data request.
 pub struct Form {
@@ -30,7 +31,7 @@ pub struct Form {
 /// A field in a multipart form.
 pub struct Part {
     meta: PartMetadata,
-    value: Body,
+    value: DynBody,
     body_length: Option<u64>,
 }
 
@@ -115,29 +116,29 @@ impl Form {
     }
 
     /// Consume this instance and transform into an instance of Body for use in a request.
-    pub(crate) fn stream(mut self) -> Body {
+    pub(crate) fn stream(mut self) -> DynBody {
         use self::stream as new_stream;
         if self.inner.fields.is_empty() {
-            return empty();
+            return empty().map_err(never).boxed_unsync();
         }
 
         // create initial part to init reduce chain
         let (name, part) = self.inner.fields.remove(0);
         let start = Box::pin(self.part_stream(name, part))
-            as Pin<Box<dyn Stream<Item = Result<Frame<Bytes>, BoxError>> + Send>>;
+            as Pin<Box<dyn Stream<Item = Result<Frame<Bytes>, BodyError>> + Send>>;
 
         let fields = self.inner.take_fields();
         // for each field, chain an additional stream
         let stream = fields.into_iter().fold(start, |memo, (name, part)| {
             let part_stream = self.part_stream(name, part);
             Box::pin(memo.chain(part_stream))
-                as Pin<Box<dyn Stream<Item = Result<Frame<Bytes>, BoxError>> + Send>>
+                as Pin<Box<dyn Stream<Item = Result<Frame<Bytes>, BodyError>> + Send>>
         });
         // append special ending boundary
         let last = stream::once(future::ready(Ok(Frame::data(
             format!("--{}--\r\n", self.boundary()).into(),
         ))));
-        Body::new(new_stream(stream.chain(last)))
+        DynBody::new(new_stream(stream.chain(last)))
     }
 
     /// Generate a hyper::Body stream for a single Part instance of a Form request.
@@ -145,7 +146,7 @@ impl Form {
         &mut self,
         name: T,
         part: Part,
-    ) -> impl Stream<Item = Result<Frame<Bytes>, BoxError>>
+    ) -> impl Stream<Item = Result<Frame<Bytes>, BodyError>>
     where
         T: Into<Cow<'static, str>>,
     {
@@ -200,11 +201,13 @@ impl Part {
     where
         T: Into<Cow<'static, str>>,
     {
-        let body = match value.into() {
+        let cow = value.into();
+        let len = cow.as_bytes().len() as u64;
+        let body = match cow {
             Cow::Borrowed(slice) => full(slice),
             Cow::Owned(string) => full(string),
         };
-        Part::new(body, None)
+        Part::new(body.map_err(never).boxed_unsync(), Some(len))
     }
 
     /// Makes a new parameter from arbitrary bytes.
@@ -218,22 +221,22 @@ impl Part {
             Cow::Borrowed(slice) => full(slice),
             Cow::Owned(vec) => full(vec),
         };
-        Part::new(body, Some(length))
+        Part::new(body.map_err(never).boxed_unsync(), Some(length))
     }
 
     /// Makes a new parameter from an arbitrary stream.
-    pub fn stream<T: Into<Body>>(value: T) -> Part {
+    pub fn stream<T: Into<DynBody>>(value: T) -> Part {
         Part::new(value.into(), None)
     }
 
     /// Makes a new parameter from an arbitrary stream with a known length. This is particularly
     /// useful when adding something like file contents as a stream, where you can know the content
     /// length beforehand.
-    pub fn stream_with_length<T: Into<Body>>(value: T, length: u64) -> Part {
+    pub fn stream_with_length<T: Into<DynBody>>(value: T, length: u64) -> Part {
         Part::new(value.into(), Some(length))
     }
 
-    fn new(value: Body, body_length: Option<u64>) -> Part {
+    fn new(value: DynBody, body_length: Option<u64>) -> Part {
         Part {
             meta: PartMetadata::new(),
             value,
@@ -570,21 +573,27 @@ mod tests {
         let mut form = Form::new()
             .part(
                 "reader1",
-                Part::stream(stream(stream::once(future::ready::<
-                    Result<Frame<Bytes>, BoxError>,
-                >(Ok(Frame::data(
-                    Bytes::from_static(b"part1"),
-                )))))),
+                Part::stream(
+                    stream(stream::once(
+                        future::ready::<Result<Frame<Bytes>, BodyError>>(Ok(Frame::data(
+                            Bytes::from_static(b"part1"),
+                        ))),
+                    ))
+                    .boxed_unsync(),
+                ),
             )
             .part("key1", Part::text("value1"))
             .part("key2", Part::text("value2").mime(mime::IMAGE_BMP))
             .part(
                 "reader2",
-                Part::stream(stream(stream::once(future::ready::<
-                    Result<Frame<Bytes>, BoxError>,
-                >(Ok(Frame::data(
-                    Bytes::from_static(b"part2"),
-                )))))),
+                Part::stream(
+                    stream(stream::once(
+                        future::ready::<Result<Frame<Bytes>, BodyError>>(Ok(Frame::data(
+                            Bytes::from_static(b"part2"),
+                        ))),
+                    ))
+                    .boxed_unsync(),
+                ),
             )
             .part("key3", Part::text("value3").file_name("filename"));
         form.inner.boundary = "boundary".to_string();
@@ -660,13 +669,14 @@ mod tests {
         let stream_len = stream_data.len();
         let stream_data = stream_data
             .chunks(3)
-            .map(|c| Ok::<_, BoxError>(Frame::data(Bytes::from(c))));
+            .map(|c| Ok::<_, BodyError>(Frame::data(Bytes::from(c))));
         let the_stream = futures_util::stream::iter(stream_data);
 
         let bytes_data = b"some bytes data".to_vec();
         let bytes_len = bytes_data.len();
 
-        let stream_part = Part::stream_with_length(stream(the_stream), stream_len as u64);
+        let stream_part =
+            Part::stream_with_length(stream(the_stream).boxed_unsync(), stream_len as u64);
         let body_part = Part::bytes(bytes_data);
 
         // A simple check to make sure we get the configured body length

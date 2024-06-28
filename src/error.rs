@@ -1,13 +1,51 @@
 use std::{borrow::Cow, fmt};
 
-use tower_http::BoxError;
-
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
     context: Cow<'static, str>,
+}
+
+impl From<http::Error> for Error {
+    fn from(val: http::Error) -> Self {
+        Error::new(ErrorKind::Http(val), "unknown")
+    }
+}
+
+#[derive(Debug)]
+pub struct BodyError(pub(crate) Box<dyn std::error::Error + Send + Sync + 'static>);
+
+impl std::fmt::Display for BodyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for BodyError {}
+#[derive(Debug)]
+pub struct ClientError(Box<dyn std::error::Error + Send + Sync + 'static>);
+
+impl<E> From<E> for ClientError
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn from(val: E) -> Self {
+        ClientError(Box::new(val))
+    }
+}
+
+impl From<ClientError> for Box<dyn std::error::Error + Send + Sync> {
+    fn from(val: ClientError) -> Self {
+        val.0
+    }
+}
+
+impl std::fmt::Display for ClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 impl Error {
@@ -98,17 +136,16 @@ error_kinds! {
         InvalidUriParts(http::uri::InvalidUriParts),
         Utf8DecodeError(std::string::FromUtf8Error),
         Unknown(Box<dyn std::error::Error + Send>),
+        MimeParse(mime::FromStrError),
+        InvalidHeaderValue(http::header::InvalidHeaderValue),
+        Body(BodyError),
+        Client(ClientError),
         #[cfg(feature = "hyper")]
         Hyper(hyper::Error),
         #[cfg(feature = "serde_json")]
         SerdeJson(serde_json::Error),
         #[cfg(feature = "serde_urlencoded")]
         SerdeUrlencoded(serde_urlencoded::ser::Error),
-        #[cfg(feature = "client-hyper")]
-        ClientHyper(hyper_util::client::legacy::Error),
-        MimeParse(mime::FromStrError),
-        InvalidHeaderValue(http::header::InvalidHeaderValue),
-        Body(BoxError),
     }
 }
 

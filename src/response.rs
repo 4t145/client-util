@@ -5,18 +5,26 @@ use std::sync::Arc;
 
 use crate::util::ok;
 use crate::Error;
+use bytes::Buf;
+use bytes::Bytes;
 use http::header::CONTENT_TYPE;
 pub use http::response::Builder;
 pub use http::response::Response;
 use http::HeaderValue;
+use http_body_util::BodyDataStream;
 use http_body_util::BodyExt;
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::str::FromStr;
-pub trait ResponseExt {
+pub trait ResponseExt<B>: Sized {
     #[cfg(feature = "json")]
     fn json<T: DeserializeOwned>(self) -> impl Future<Output = crate::Result<Response<T>>> + Send;
     fn text(self) -> impl Future<Output = crate::Result<Response<String>>> + Send;
+    fn bytes(self) -> impl Future<Output = crate::Result<Response<Bytes>>> + Send;
+    fn data_stream(self) -> Response<BodyDataStream<B>>;
+    fn buffer(self) -> impl Future<Output = crate::Result<Response<impl Buf>>> + Send;
+    #[cfg(feature = "hyper")]
+    fn hyper_upgrade(self) -> impl Future<Output = crate::Result<hyper::upgrade::Upgraded>> + Send;
 }
 
 pub type TextDecodeFn = fn(Vec<u8>) -> Result<String, Box<dyn std::error::Error + Send>>;
@@ -34,7 +42,7 @@ impl Decoders {
     }
 }
 
-impl<B> ResponseExt for Response<B>
+impl<B> ResponseExt<B> for Response<B>
 where
     B: http_body::Body + Send,
     B::Data: Send,
@@ -93,5 +101,41 @@ where
         };
 
         Ok(Response::from_parts(parts, string_body))
+    }
+
+    fn data_stream(self) -> Response<BodyDataStream<B>> {
+        let (parts, body) = self.into_parts();
+        let body = BodyDataStream::new(body);
+        Response::from_parts(parts, body)
+    }
+
+    async fn bytes(self) -> crate::Result<Response<Bytes>> {
+        let (parts, body) = self.into_parts();
+        let body = body
+            .collect()
+            .await
+            .map_err(Error::custom_with_context("collecting body stream"))?
+            .to_bytes();
+        Ok(Response::from_parts(parts, body))
+    }
+
+    async fn buffer(self) -> crate::Result<Response<impl Buf>> {
+        let (parts, body) = self.into_parts();
+        let body = body
+            .collect()
+            .await
+            .map_err(Error::custom_with_context("collecting body stream"))?
+            .aggregate();
+        Ok(Response::from_parts(parts, body))
+    }
+
+    #[cfg(feature = "hyper")]
+    /// Upgrade the connection to a different protocol with hyper.
+    ///
+    /// This function yield a asynchronous io. You can use this to create a websocket connection by using some websocket lib.
+    async fn hyper_upgrade(self) -> crate::Result<hyper::upgrade::Upgraded> {
+        hyper::upgrade::on(self)
+            .await
+            .map_err(Error::with_context("upgrade connection"))
     }
 }

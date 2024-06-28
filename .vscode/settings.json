@@ -2,9 +2,12 @@
     "cSpell.words": [
         "NISTP",
         "PKCS",
-        "rustls"
+        "rustls",
+        "Unsync"
     ],
     "rust-analyzer.cargo.features": [
-        "json"
+        "json",
+        "full",
+        "multipart"
     ]
 }
