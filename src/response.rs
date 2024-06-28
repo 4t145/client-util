@@ -103,6 +103,7 @@ where
         Ok(Response::from_parts(parts, string_body))
     }
 
+    #[inline]
     fn data_stream(self) -> Response<BodyDataStream<B>> {
         let (parts, body) = self.into_parts();
         let body = BodyDataStream::new(body);

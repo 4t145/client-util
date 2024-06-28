@@ -12,7 +12,8 @@ tower-service = "0.3"
 http-body = "1"
 bytes = "1.6"
 mime = "0.3"
-
+pin-project-lite = "0.2"
+tower = { version = "0.4", features = ["util"] }
 # Extension layer
 tower-http = { version = "0.5", features = ["timeout"] }
 
@@ -47,8 +48,7 @@ percent-encoding = { version = "2.3", optional = true }
 # Stream
 futures-core = { version = "0.3", optional = true }
 futures-util = { version = "0.3", optional = true }
-pin-project-lite = "0.2.14"
-tower = { version = "0.4.13", features = ["util"] }
+
 
 [features]
 default = ["client-hyper", "tls", "json", "query", "decompression-all"]

@@ -300,6 +300,7 @@ where
         Ok(Request::from_parts(parts, full(body)))
     }
 
+    #[inline]
     fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<Full<Bytes>>> {
         let (mut parts, _) = self.into_parts();
         parts.headers.insert(
@@ -308,6 +309,8 @@ where
         );
         Ok(Request::from_parts(parts, full(body)))
     }
+
+    #[inline]
     fn empty(self) -> crate::Result<Request<Empty<Bytes>>> {
         let (parts, _) = self.into_parts();
         Ok(Request::from_parts(parts, empty()))
@@ -331,11 +334,14 @@ where
             .to_bytes();
         Ok(Request::from_parts(parts, full(body)))
     }
+
+    #[inline]
     fn with_version(mut self, version: http::Version) -> Request<B> {
         *self.version_mut() = version;
         self
     }
 
+    #[inline]
     fn with_method(mut self, method: http::Method) -> Request<B> {
         *self.method_mut() = method;
         self
@@ -354,6 +360,7 @@ where
     }
     */
 
+    #[inline]
     fn with_header<K>(mut self, key: K, value: http::header::HeaderValue) -> Request<B>
     where
         K: http::header::IntoHeaderName,
@@ -362,11 +369,13 @@ where
         self
     }
 
+    #[inline]
     fn with_headers(mut self, header_map: http::header::HeaderMap) -> Request<B> {
         self.headers_mut().extend(header_map);
         self
     }
 
+    #[inline]
     fn apply<M, U>(self, modifier: M) -> crate::Result<Request<U>>
     where
         M: RequestModifier<B, U>,
@@ -541,6 +550,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "auth")]
     fn test_basic_auth_sensitive_header() {
         let some_url = "https://localhost/";
 
@@ -558,6 +568,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "auth")]
     fn test_bearer_auth_sensitive_header() {
         let some_url = "https://localhost/";
 
