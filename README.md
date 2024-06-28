@@ -4,7 +4,8 @@ Help you to make your own http client. At least this crate can help you to use h
 
 ## No Encapsulation Here
 
-Use extra features 
+## Work with tower
+
 
 
 

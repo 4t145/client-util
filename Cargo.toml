@@ -51,7 +51,15 @@ futures-util = { version = "0.3", optional = true }
 
 
 [features]
-default = ["client-hyper", "tls", "json", "query", "decompression-all"]
+default = [
+    "client-hyper",
+    "tls",
+    "json",
+    "query",
+    "decompression-deflate",
+    "decompression-gzip",
+    "decompression-br",
+]
 
 futures-util = ["dep:futures-util"]
 futures-core = ["dep:futures-core"]
