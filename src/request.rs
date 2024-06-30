@@ -20,27 +20,22 @@ use crate::client::MaybeAbort;
 use crate::error::BodyError;
 use crate::error::ClientError;
 
-pub trait TryIntoRequest {
-    type Error: std::error::Error + Send + 'static;
-    type Body: http_body::Body + Send;
-    fn try_into_request(self) -> Result<Request<Self::Body>, Self::Error>;
-}
-
-pub trait RequestModifier<T, U> {
-    fn modify(self, req: Request<T>) -> crate::Result<Request<U>>;
-}
-
+/// Extension trait for [`http::Request`].
 pub trait RequestExt<B>: Sized {
     #[cfg(feature = "json")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     fn json<T: Serialize + ?Sized>(self, body: &T) -> crate::Result<Request<Full<Bytes>>>;
     #[cfg(feature = "query")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "query")))]
     fn query<Q: Serialize + ?Sized>(self, query: &Q) -> crate::Result<Request<B>>;
     #[cfg(feature = "multipart")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
     fn multipart(
         self,
         form: multipart::Form,
     ) -> crate::Result<Request<UnsyncBoxBody<Bytes, BodyError>>>;
     #[cfg(feature = "form")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "form")))]
     fn form<T: Serialize + ?Sized>(self, form: &T) -> crate::Result<Request<Full<Bytes>>>;
     fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<Full<Bytes>>>;
     fn empty(self) -> crate::Result<Request<Empty<Bytes>>>;
@@ -55,6 +50,7 @@ pub trait RequestExt<B>: Sized {
         K: http::header::IntoHeaderName;
     fn with_headers(self, header_map: http::header::HeaderMap) -> Request<B>;
     #[cfg(feature = "auth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
     fn basic_auth<U, P>(self, username: U, password: Option<P>) -> Request<B>
     where
         U: std::fmt::Display,
@@ -66,6 +62,7 @@ pub trait RequestExt<B>: Sized {
     }
 
     #[cfg(feature = "auth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
     fn bearer_auth<T>(self, token: T) -> Request<B>
     where
         T: std::fmt::Display,
@@ -73,10 +70,6 @@ pub trait RequestExt<B>: Sized {
         let header_value = crate::util::bearer_auth(token);
         self.with_header(http::header::AUTHORIZATION, header_value)
     }
-
-    fn apply<M, U>(self, modifier: M) -> crate::Result<Request<U>>
-    where
-        M: RequestModifier<B, U>;
 
     fn send<S, R>(self, client: S) -> impl Future<Output = crate::Result<S::Response>> + Send
     where
@@ -88,6 +81,9 @@ pub trait RequestExt<B>: Sized {
             std::error::Error + Send + Sync + 'static,
         <S as tower_service::Service<Request<ClientBody>>>::Future: Send;
 
+    #[cfg(feature = "rt-tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-tokio")))]
+    /// Send the request to a service with a timeout layer.
     fn send_timeout<S, R>(
         self,
         client: S,
@@ -111,32 +107,41 @@ pub trait RequestExt<B>: Sized {
     }
 }
 
+/// Extension trait for [`http::request::Builder`].
 pub trait RequestBuilderExt: Sized {
     #[cfg(feature = "json")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     fn json<T: Serialize + ?Sized>(self, body: &T) -> crate::Result<Request<Full<Bytes>>>;
     #[cfg(feature = "query")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "query")))]
     fn query<Q: Serialize + ?Sized>(self, query: &Q) -> crate::Result<Self>;
     #[cfg(feature = "multipart")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
     fn multipart(self, form: multipart::Form) -> crate::Result<Request<crate::DynBody>>;
     #[cfg(feature = "form")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "form")))]
     fn form<T: Serialize + ?Sized>(self, form: &T) -> crate::Result<Request<Full<Bytes>>>;
     fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<Full<Bytes>>>;
     fn empty(self) -> crate::Result<Request<Empty<Bytes>>>;
     fn headers(self, header_map: http::header::HeaderMap) -> Self;
     #[cfg(feature = "auth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
     fn basic_auth<U, P>(self, username: U, password: Option<P>) -> Self
     where
         U: std::fmt::Display,
         P: std::fmt::Display,
         Self: Sized;
     #[cfg(feature = "auth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
     fn bearer_auth<T>(self, token: T) -> Self
     where
         T: std::fmt::Display;
 }
 
 impl RequestBuilderExt for Builder {
+    /// Consumes the builder, setting the request body as JSON.
     #[cfg(feature = "json")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     fn json<T: Serialize + ?Sized>(self, body: &T) -> crate::Result<Request<Full<Bytes>>> {
         let req = self
             .body(())
@@ -144,7 +149,9 @@ impl RequestBuilderExt for Builder {
         req.json(body)
     }
 
+    /// Add query parameters to the request URI.
     #[cfg(feature = "query")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "query")))]
     fn query<Q: Serialize + ?Sized>(self, query: &Q) -> crate::Result<Self> {
         let new_uri = if let Some(uri) = self.uri_ref() {
             build_query_uri(uri.clone(), query)?
@@ -154,7 +161,9 @@ impl RequestBuilderExt for Builder {
         Ok(self.uri(new_uri))
     }
 
+    /// Consumes the builder, setting the request body as multipart form data.
     #[cfg(feature = "multipart")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
     fn multipart(self, form: multipart::Form) -> crate::Result<Request<crate::DynBody>> {
         let req = self
             .body(())
@@ -162,7 +171,9 @@ impl RequestBuilderExt for Builder {
         req.multipart(form)
     }
 
+    /// Consumes the builder, setting the request body as form data.
     #[cfg(feature = "form")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "form")))]
     fn form<T: Serialize + ?Sized>(self, form: &T) -> crate::Result<Request<Full<Bytes>>> {
         let req = self
             .body(())
@@ -170,6 +181,7 @@ impl RequestBuilderExt for Builder {
         req.form(form)
     }
 
+    /// Consumes the builder, setting the request body as plain text.
     fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<Full<Bytes>>> {
         let req = self
             .body(())
@@ -177,13 +189,16 @@ impl RequestBuilderExt for Builder {
         req.plain_text(body)
     }
 
+    /// Consumes the builder, setting the request body as empty.
     fn empty(self) -> crate::Result<Request<Empty<Bytes>>> {
         self.body(())
             .map_err(crate::Error::with_context("build request body"))?
             .empty()
     }
 
+    /// Add basic authentication to the request.
     #[cfg(feature = "auth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
     fn basic_auth<U, P>(self, username: U, password: Option<P>) -> Self
     where
         U: std::fmt::Display,
@@ -194,7 +209,9 @@ impl RequestBuilderExt for Builder {
         self.header(http::header::AUTHORIZATION, header_value)
     }
 
+    /// Add bearer authentication to the request.
     #[cfg(feature = "auth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
     fn bearer_auth<T>(self, token: T) -> Self
     where
         T: std::fmt::Display,
@@ -203,6 +220,7 @@ impl RequestBuilderExt for Builder {
         self.header(http::header::AUTHORIZATION, header_value)
     }
 
+    /// Extend multiple request headers.
     fn headers(mut self, header_map: http::header::HeaderMap) -> Self {
         if let Some(headers) = self.headers_mut() {
             headers.extend(header_map);
@@ -215,7 +233,9 @@ impl<B> RequestExt<B> for Request<B>
 where
     B: Send,
 {
+    /// Set the request body as JSON.
     #[cfg(feature = "json")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     fn json<T: Serialize + ?Sized>(self, body: &T) -> crate::Result<Request<Full<Bytes>>> {
         let json_body =
             serde_json::to_vec(&body).map_err(crate::Error::with_context("serialize json body"))?;
@@ -228,7 +248,9 @@ where
         Ok(request)
     }
 
+    /// Add query parameters to the request URI.
     #[cfg(feature = "query")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "query")))]
     fn query<Q: Serialize + ?Sized>(self, query: &Q) -> crate::Result<Request<B>> {
         use http::uri::PathAndQuery;
         use std::str::FromStr;
@@ -264,7 +286,9 @@ where
         Ok(Request::from_parts(parts, body))
     }
 
+    /// Set the request body as multipart form data.
     #[cfg(feature = "multipart")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
     fn multipart(self, mut form: multipart::Form) -> crate::Result<Request<crate::DynBody>> {
         let (mut parts, _) = self.into_parts();
         let boundary = form.boundary();
@@ -288,7 +312,9 @@ where
         Ok(Request::from_parts(parts, body))
     }
 
+    /// Set the request body as form data.
     #[cfg(feature = "form")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "form")))]
     fn form<T: Serialize + ?Sized>(self, form: &T) -> crate::Result<Request<Full<Bytes>>> {
         let (mut parts, _) = self.into_parts();
         let body = serde_urlencoded::to_string(form)
@@ -300,6 +326,7 @@ where
         Ok(Request::from_parts(parts, full(body)))
     }
 
+    /// Set the request body as plain text.
     #[inline]
     fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<Full<Bytes>>> {
         let (mut parts, _) = self.into_parts();
@@ -310,11 +337,14 @@ where
         Ok(Request::from_parts(parts, full(body)))
     }
 
+    /// Set the request body as empty.
     #[inline]
     fn empty(self) -> crate::Result<Request<Empty<Bytes>>> {
         let (parts, _) = self.into_parts();
         Ok(Request::from_parts(parts, empty()))
     }
+
+    /// Collect the request body stream into bytes. This is useful when you want to clone the request.
     async fn collect_into_bytes(self) -> crate::Result<Request<Full<Bytes>>>
     where
         B: http_body::Body<Data = Bytes> + Send + 'static,
@@ -335,12 +365,14 @@ where
         Ok(Request::from_parts(parts, full(body)))
     }
 
+    /// Set the request HTTP version.
     #[inline]
     fn with_version(mut self, version: http::Version) -> Request<B> {
         *self.version_mut() = version;
         self
     }
 
+    /// Set the request method.
     #[inline]
     fn with_method(mut self, method: http::Method) -> Request<B> {
         *self.method_mut() = method;
@@ -360,6 +392,7 @@ where
     }
     */
 
+    /// Set a request header.
     #[inline]
     fn with_header<K>(mut self, key: K, value: http::header::HeaderValue) -> Request<B>
     where
@@ -369,20 +402,16 @@ where
         self
     }
 
+    /// Extend multiple request headers.
     #[inline]
     fn with_headers(mut self, header_map: http::header::HeaderMap) -> Request<B> {
         self.headers_mut().extend(header_map);
         self
     }
 
-    #[inline]
-    fn apply<M, U>(self, modifier: M) -> crate::Result<Request<U>>
-    where
-        M: RequestModifier<B, U>,
-    {
-        modifier.modify(self)
-    }
-
+    /// Send the request to a service.
+    ///
+    /// If you enabled any decompression feature, the response body will be automatically decompressed.
     #[allow(unused_mut)]
     async fn send<S, R>(self, mut client: S) -> crate::Result<S::Response>
     where
@@ -395,28 +424,38 @@ where
         <S as tower_service::Service<Request<ClientBody>>>::Future: Send,
     {
         use http_body_util::BodyExt;
+        #[allow(unused_imports)]
         use tower_service::Service;
-        #[cfg(any(
-            feature = "decompression-deflate",
-            feature = "decompression-gzip",
-            feature = "decompression-br",
-            feature = "decompression-zstd",
+        #[cfg(all(
+            any(
+                feature = "decompression-deflate",
+                feature = "decompression-gzip",
+                feature = "decompression-br",
+                feature = "decompression-zstd",
+            ),
+            feature = "rt-tokio"
         ))]
         let mut client = tower_http::decompression::Decompression::new(client);
         let request = self.map(|b| UnsyncBoxBody::new(b.map_err(|e| BodyError(Box::new(e)))));
         match client.call(request).await {
-            #[cfg(any(
-                feature = "decompression-deflate",
-                feature = "decompression-gzip",
-                feature = "decompression-br",
-                feature = "decompression-zstd",
+            #[cfg(all(
+                any(
+                    feature = "decompression-deflate",
+                    feature = "decompression-gzip",
+                    feature = "decompression-br",
+                    feature = "decompression-zstd",
+                ),
+                feature = "rt-tokio"
             ))]
             Ok(response) => Ok(response.map(|b| b.into_inner())),
-            #[cfg(not(any(
-                feature = "decompression-deflate",
-                feature = "decompression-gzip",
-                feature = "decompression-br",
-                feature = "decompression-zstd",
+            #[cfg(not(all(
+                any(
+                    feature = "decompression-deflate",
+                    feature = "decompression-gzip",
+                    feature = "decompression-br",
+                    feature = "decompression-zstd",
+                ),
+                feature = "rt-tokio"
             )))]
             Ok(response) => Ok(response),
             Err(e) => {

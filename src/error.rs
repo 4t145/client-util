@@ -59,6 +59,7 @@ impl Error {
             context: context.into(),
         }
     }
+    /// Create a new error with a context.
     pub fn with_context<C, K>(context: C) -> impl FnOnce(K) -> Self
     where
         C: Into<Cow<'static, str>>,
@@ -69,6 +70,7 @@ impl Error {
             context: context.into(),
         }
     }
+    /// Create a new custom error with a context.
     pub fn custom_with_context<C, E>(context: C) -> impl FnOnce(E) -> Self
     where
         C: Into<Cow<'static, str>>,

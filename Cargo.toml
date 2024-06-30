@@ -2,6 +2,13 @@
 name = "client-util"
 version = "0.1.0"
 edition = "2021"
+authors = ["4t145<u4t145@163.com>"]
+description = "Help you to build requests and handle responses by several extension trait!"
+repository = "https://github.com/4t145/client-util"
+license = "Apache-2.0"
+keywords = ["http", "tower", "hyper", "client", "middleware"]
+categories = ["asynchronous", "network-programming"]
+readme = "README.md"
 
 [dependencies]
 
@@ -15,7 +22,7 @@ mime = "0.3"
 pin-project-lite = "0.2"
 tower = { version = "0.4", features = ["util"] }
 # Extension layer
-tower-http = { version = "0.5", features = ["timeout"] }
+tower-http = { version = "0.5", features = ["timeout"], optional = true }
 
 # Hyper client
 hyper = { version = "1.3", features = ["client"], optional = true }
@@ -48,14 +55,17 @@ percent-encoding = { version = "2.3", optional = true }
 # Stream
 futures-core = { version = "0.3", optional = true }
 futures-util = { version = "0.3", optional = true }
+encoding_rs = { version = "0.8.34", optional = true }
 
 
 [features]
 default = [
+    "rt-tokio",
     "client-hyper",
-    "tls",
+    "client-hyper-rustls",
     "json",
     "query",
+    "stream",
     "decompression-deflate",
     "decompression-gzip",
     "decompression-br",
@@ -71,9 +81,12 @@ serde = ["dep:serde"]
 serde_json = ["dep:serde_json", "serde"]
 serde_urlencoded = ["dep:serde_urlencoded", "serde"]
 base64 = ["dep:base64"]
-stream = ["futures-core", "futures-util"]
 client-hyper = ["hyper", "hyper-util"]
-tls = ["hyper-rustls", "rustls"]
+client-hyper-rustls = ["hyper-rustls", "rustls"]
+encoding_rs = ["dep:encoding_rs"]
+
+# Stream support
+stream = ["futures-core", "futures-util"]
 
 # json support
 json = ["serde_json"]
@@ -101,8 +114,15 @@ decompression-gzip = ["tower-http/decompression-gzip"]
 decompression-br = ["tower-http/decompression-br"]
 decompression-zstd = ["tower-http/decompression-zstd"]
 
+# charset decoding
+charset = ["encoding_rs"]
+
+
+# Runtime
+rt-tokio = ["dep:tower-http"]
+
 # full
-full = ["client-hyper", "tls", "form", "json", "query", "auth", "multipart"]
+full = ["client-hyper", "client-hyper-rustls", "form", "json", "query", "auth", "multipart"]
 
 [dev-dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
@@ -115,6 +135,11 @@ hyper-util = { version = "0.1", features = [
     "http2",
     "client-legacy",
 ] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [[example]]
 name = "json"
 path = "examples/json.rs"

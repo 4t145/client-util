@@ -20,7 +20,8 @@ pub fn build_hyper_client() -> HyperClient {
 crate::shared_client!(pub hyper_client: build_hyper_client -> HyperClient);
 
 /// TLS support
-#[cfg(feature = "tls")]
+#[cfg(feature = "client-hyper-rustls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client-hyper-rustls")))]
 mod tls {
     use hyper_rustls::HttpsConnector;
     use hyper_rustls::HttpsConnectorBuilder;
@@ -113,5 +114,6 @@ mod tls {
     crate::shared_client!(pub hyper_tls_client: build_tls_hyper_client -> HyperTlsClient);
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "client-hyper-rustls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client-hyper-rustls")))]
 pub use tls::*;

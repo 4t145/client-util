@@ -1,4 +1,5 @@
-pub const fn ok<U, T, E>(map: impl FnOnce(U) -> Result<T, E>) -> impl FnOnce(U) -> Option<T> {
+/// ok: `( U -> Result<T, E> ) -> ( U -> Option<T> )`
+pub(crate) const fn ok<U, T, E>(map: impl FnOnce(U) -> Result<T, E>) -> impl FnOnce(U) -> Option<T> {
     move |u| match map(u) {
         Ok(t) => Some(t),
         Err(_) => None,
@@ -6,11 +7,12 @@ pub const fn ok<U, T, E>(map: impl FnOnce(U) -> Result<T, E>) -> impl FnOnce(U) 
 }
 
 /// a function wrapper for unreachable! macro
-pub fn never<T, U>(_: T) -> U {
+pub(crate) fn never<T, U>(_: T) -> U {
     unreachable!("I'll never let you down ~");
 }
 
 #[cfg(feature = "auth")]
+#[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
 pub fn basic_auth<U, P>(username: U, password: Option<P>) -> http::HeaderValue
 where
     U: std::fmt::Display,
@@ -35,6 +37,7 @@ where
 }
 
 #[cfg(feature = "auth")]
+#[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
 pub fn bearer_auth<T>(token: T) -> http::HeaderValue
 where
     T: std::fmt::Display,
@@ -49,14 +52,38 @@ where
 }
 
 #[cfg(feature = "multipart")]
-pub fn simple_rand() -> u64 {
-    use std::time::SystemTime;
-    let timestamp = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("system time is always after epoch")
-        .as_nanos();
-    use std::hash::{DefaultHasher, Hasher};
-    let mut hasher = DefaultHasher::new();
-    hasher.write_u128(timestamp);
-    hasher.finish()
+#[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
+pub(crate) fn fast_random() -> u64 {
+    use std::cell::Cell;
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    use std::num::Wrapping;
+
+    thread_local! {
+        static RNG: Cell<Wrapping<u64>> = Cell::new(Wrapping(seed()));
+    }
+
+    fn seed() -> u64 {
+        let seed = RandomState::new();
+
+        let mut out = 0;
+        let mut cnt = 0;
+        while out == 0 {
+            cnt += 1;
+            let mut hasher = seed.build_hasher();
+            hasher.write_usize(cnt);
+            out = hasher.finish();
+        }
+        out
+    }
+
+    RNG.with(|rng| {
+        let mut n = rng.get();
+        debug_assert_ne!(n.0, 0);
+        n ^= n >> 12;
+        n ^= n << 25;
+        n ^= n >> 27;
+        rng.set(n);
+        n.0.wrapping_mul(0x2545_f491_4f6c_dd1d)
+    })
 }

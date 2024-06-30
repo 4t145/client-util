@@ -7,12 +7,14 @@
 //!
 //! However, you can use any service as a client, and add more layer upon it.
 #[cfg(feature = "client-hyper")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client-hyper")))]
 pub mod hyper;
 use crate::error::BodyError;
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::combinators::UnsyncBoxBody;
 #[cfg(feature = "client-hyper")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client-hyper")))]
 pub use hyper::*;
 
 #[macro_export]

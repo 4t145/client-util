@@ -5,6 +5,8 @@ use futures_core::Stream;
 use http_body_util::{combinators::UnsyncBoxBody, Empty, Full};
 
 pub type DynBody = UnsyncBoxBody<Bytes, BodyError>;
+
+/// Create a new full body.
 pub fn full<B>(body: B) -> Full<Bytes>
 where
     B: Into<Bytes>,
@@ -13,6 +15,7 @@ where
     Full::new(body)
 }
 
+/// Create a new empty body.
 pub fn empty() -> Empty<Bytes> {
     Empty::new()
 }

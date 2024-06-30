@@ -1,0 +1,38 @@
+name: Test And Release
+
+on:
+  push:
+    branches: ["release", "master"]
+  pull_request:
+    branches: ["release", "master"]
+  release:
+    types: [created]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --all-features
+      - name: Run clippy
+        run: cargo clippy --all-features
+      - name: Run fmt
+        run: cargo fmt --all --check
+      - name: Run tests
+        run: cargo test --all-features
+      - name: publish dry run
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --dry-run
+
+  release:
+    needs: check
+    if: github.event_name == 'release' && github.event.action == 'created'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: publish
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use client_util::prelude::*;
-
+// use client_util::prelude::*;
+use client_util::prelude::{RequestBuilderExt, RequestExt, ResponseExt};
 #[tokio::main]
 async fn main() -> client_util::Result<()> {
     let mut client = client_util::client::hyper_tls_client();

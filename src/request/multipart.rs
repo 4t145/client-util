@@ -80,7 +80,8 @@ impl Form {
     /// # Examples
     ///
     /// ```
-    /// let form = reqwest::multipart::Form::new()
+    /// # use client_util::prelude::*;
+    /// let form = Form::new()
     ///     .text("username", "seanmonstar")
     ///     .text("password", "secret");
     /// ```
@@ -537,10 +538,10 @@ impl PercentEncoding {
 fn gen_boundary() -> String {
     // use crate::util::fast_random as random;
 
-    let a = crate::util::simple_rand();
-    let b = crate::util::simple_rand();
-    let c = crate::util::simple_rand();
-    let d = crate::util::simple_rand();
+    let a = crate::util::fast_random();
+    let b = crate::util::fast_random();
+    let c = crate::util::fast_random();
+    let d = crate::util::fast_random();
 
     format!("{a:016x}-{b:016x}-{c:016x}-{d:016x}")
 }
