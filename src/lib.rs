@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-
 #![warn(
     clippy::all,
     clippy::dbg_macro,
@@ -30,7 +29,7 @@
     clippy::verbose_file_reads,
     clippy::unnested_or_patterns,
     future_incompatible,
-    nonstandard_style,
+    nonstandard_style
 )]
 pub mod body;
 pub mod client;
