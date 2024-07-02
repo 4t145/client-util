@@ -346,7 +346,7 @@ where
         let (parts, _) = self.into_parts();
         Ok(Request::from_parts(parts, StreamBody::new(stream)))
     }
-    
+
     /// Set the request body as empty.
     #[inline]
     fn empty(self) -> crate::Result<Request<Empty<Bytes>>> {
