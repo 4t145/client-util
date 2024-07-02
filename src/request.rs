@@ -1,18 +1,19 @@
 #[cfg(feature = "multipart")]
 mod multipart;
 use bytes::Bytes;
+use futures_core::Stream;
 use http::request::Builder;
 use http::HeaderValue;
 use http::Request;
 use http::Response;
 use http::{header::CONTENT_TYPE, Uri};
+use http_body_util::StreamBody;
 use http_body_util::{combinators::UnsyncBoxBody, Empty, Full};
 #[cfg(feature = "multipart")]
 pub use multipart::*;
-use std::future::Future;
-
 #[cfg(feature = "serde")]
 use serde::Serialize;
+use std::future::Future;
 
 use crate::body::{empty, full};
 use crate::client::ClientBody;
@@ -37,6 +38,8 @@ pub trait RequestExt<B>: Sized {
     #[cfg(feature = "form")]
     #[cfg_attr(docsrs, doc(cfg(feature = "form")))]
     fn form<T: Serialize + ?Sized>(self, form: &T) -> crate::Result<Request<Full<Bytes>>>;
+    #[cfg(feature = "stream")]
+    fn stream<S: Stream>(self, stream: S) -> crate::Result<Request<StreamBody<S>>>;
     fn plain_text(self, body: impl Into<Bytes>) -> crate::Result<Request<Full<Bytes>>>;
     fn empty(self) -> crate::Result<Request<Empty<Bytes>>>;
     fn collect_into_bytes(self) -> impl Future<Output = crate::Result<Request<Full<Bytes>>>> + Send
@@ -337,6 +340,13 @@ where
         Ok(Request::from_parts(parts, full(body)))
     }
 
+    /// Set the request body as a stream.
+    #[cfg(feature = "stream")]
+    fn stream<S: Stream>(self, stream: S) -> crate::Result<Request<StreamBody<S>>> {
+        let (parts, _) = self.into_parts();
+        Ok(Request::from_parts(parts, StreamBody::new(stream)))
+    }
+    
     /// Set the request body as empty.
     #[inline]
     fn empty(self) -> crate::Result<Request<Empty<Bytes>>> {

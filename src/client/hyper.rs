@@ -1,7 +1,7 @@
 pub use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::{connect::Connect, Client};
 
-type HyperClient = Client<HttpConnector, crate::DynBody>;
+pub type HyperClient = Client<HttpConnector, crate::DynBody>;
 
 pub fn build_hyper_client_with_connector<C>(connector: C) -> Client<C, crate::DynBody>
 where
@@ -83,7 +83,7 @@ mod tls {
     }
     use super::build_hyper_client_with_connector;
 
-    type HyperTlsClient = Client<HttpsConnector<HttpConnector>, crate::DynBody>;
+    pub type HyperTlsClient = Client<HttpsConnector<HttpConnector>, crate::DynBody>;
 
     pub fn build_connector_with_tls_config(
         tls_config: rustls::ClientConfig,
