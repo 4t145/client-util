@@ -47,7 +47,7 @@ You can find those features in [`tower-http`](./https://docs.rs/tower-http/lates
 
 ###  What about cookies?
 
-Implement a tower layer to manage cookies is a good idea, and we may implement in another crate in the future.
+We have [`tower-cookie`](https://crates.io/crates/tower-cookies)
 
 ## Feature Flags
 |flag                           |description                                |
