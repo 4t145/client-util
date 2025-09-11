@@ -4,7 +4,7 @@ use std::time::Duration;
 use client_util::prelude::{RequestBuilderExt, RequestExt, ResponseExt};
 #[tokio::main]
 async fn main() -> client_util::Result<()> {
-    let mut client = client_util::client::hyper_tls_client();
+    let mut client = client_util::client::build_https_client().unwrap();
     let request = http::Request::get("https://httpbin.org/json")
         .version(http::Version::HTTP_11)
         .empty()?;
