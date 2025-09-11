@@ -12,10 +12,10 @@ cargo add client-util
 
 ### Make it easier to use hyper http client
 ```rust
-use client_util::prelude::{RequestBuilderExt, RequestExt, ResponseExt, hyper_tls_client};
+use client_util::prelude::{RequestBuilderExt, RequestExt, ResponseExt, build_https_client};
 #[tokio::main]
 async fn main() -> client_util::Result<()> {
-    let mut client = hyper_tls_client();
+    let mut client = build_https_client().expect("fail to build client");
 
     let request = http::Request::get("https://httpbin.org/json")
         .version(http::Version::HTTP_11)
