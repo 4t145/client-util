@@ -1,6 +1,6 @@
 [package]
 name = "client-util"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["4t145<u4t145@163.com>"]
 description = "Help you to build requests and handle responses by several extension trait!"
@@ -17,15 +17,15 @@ http = "1"
 http-body-util = "0.1"
 tower-service = "0.3"
 http-body = "1"
-bytes = "1.6"
+bytes = "1"
 mime = "0.3"
 pin-project-lite = "0.2"
-tower = { version = "0.4", features = ["util"] }
+tower = { version = "0.5", features = ["util"] }
 # Extension layer
-tower-http = { version = "0.5", features = ["timeout"], optional = true }
+tower-http = { version = "0.6", features = ["timeout"], optional = true }
 
 # Hyper client
-hyper = { version = "1.3", features = ["client"], optional = true }
+hyper = { version = "1", features = ["client"], optional = true }
 hyper-util = { version = "0.1", features = [
     "client",
     "http1",
@@ -55,9 +55,7 @@ percent-encoding = { version = "2.3", optional = true }
 # Stream
 futures-core = { version = "0.3", optional = true }
 futures-util = { version = "0.3", optional = true }
-encoding_rs = { version = "0.8.34", optional = true }
-opentelemetry-http = { version = "0.12.0", optional = true }
-
+encoding_rs = { version = "0.8", optional = true }
 
 [features]
 default = [
@@ -124,10 +122,9 @@ rt-tokio = ["dep:tower-http"]
 
 # full
 full = ["client-hyper", "client-hyper-rustls", "form", "json", "query", "auth", "multipart"]
-opentelemetry-http = ["dep:opentelemetry-http"]
 
 [dev-dependencies]
-tokio = { version = "1.38.0", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 hyper = { version = "1.3", features = ["server", "client"] }
 hyper-util = { version = "0.1", features = [
