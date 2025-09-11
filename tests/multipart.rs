@@ -42,7 +42,7 @@ async fn text_part() {
     });
 
     let url = format!("http://{}/multipart/1", server.addr());
-    let mut client = hyper_tls_client();
+    let mut client = build_https_client().unwrap();
     let res = Request::post(&url)
         .multipart(form)
         .expect("fail to build request")
@@ -109,7 +109,7 @@ async fn stream_part() {
     let res = Request::post(&url)
         .multipart(form)
         .expect("fail to build request")
-        .send(hyper_tls_client())
+        .send(build_https_client().unwrap())
         .await
         .expect("Failed to post multipart");
     assert_eq!(res.status(), http::StatusCode::OK);

@@ -5,7 +5,7 @@ async fn main() -> client_util::Result<()> {
     let form = Form::new()
         .text("key", "value")
         .part("file", Part::bytes(b"hello, world!"));
-    let mut client = client_util::client::hyper_tls_client();
+    let mut client = client_util::client::build_https_client().unwrap();
     let request = http::Request::post("https://httpbin.org/anything")
         .version(http::Version::HTTP_11)
         .body(())?
