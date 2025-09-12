@@ -226,14 +226,14 @@ impl Part {
     }
 
     /// Makes a new parameter from an arbitrary stream.
-    pub fn stream<T: Into<DynBody>>(value: T) -> Part {
+    pub fn body<T: Into<DynBody>>(value: T) -> Part {
         Part::new(value.into(), None)
     }
 
     /// Makes a new parameter from an arbitrary stream with a known length. This is particularly
     /// useful when adding something like file contents as a stream, where you can know the content
     /// length beforehand.
-    pub fn stream_with_length<T: Into<DynBody>>(value: T, length: u64) -> Part {
+    pub fn body_with_length<T: Into<DynBody>>(value: T, length: u64) -> Part {
         Part::new(value.into(), Some(length))
     }
 
@@ -574,7 +574,7 @@ mod tests {
         let mut form = Form::new()
             .part(
                 "reader1",
-                Part::stream(
+                Part::body(
                     stream(stream::once(
                         future::ready::<Result<Frame<Bytes>, BodyError>>(Ok(Frame::data(
                             Bytes::from_static(b"part1"),
@@ -587,7 +587,7 @@ mod tests {
             .part("key2", Part::text("value2").mime(mime::IMAGE_BMP))
             .part(
                 "reader2",
-                Part::stream(
+                Part::body(
                     stream(stream::once(
                         future::ready::<Result<Frame<Bytes>, BodyError>>(Ok(Frame::data(
                             Bytes::from_static(b"part2"),
@@ -677,7 +677,7 @@ mod tests {
         let bytes_len = bytes_data.len();
 
         let stream_part =
-            Part::stream_with_length(stream(the_stream).boxed_unsync(), stream_len as u64);
+            Part::body_with_length(stream(the_stream).boxed_unsync(), stream_len as u64);
         let body_part = Part::bytes(bytes_data);
 
         // A simple check to make sure we get the configured body length

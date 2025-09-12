@@ -9,7 +9,7 @@
 #[cfg(feature = "client-hyper")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client-hyper")))]
 pub mod hyper;
-use crate::error::BodyError;
+use crate::body::StdError as BodyError;
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::combinators::UnsyncBoxBody;

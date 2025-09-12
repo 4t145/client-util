@@ -67,7 +67,7 @@ async fn stream_part() {
         Bytes::from_static(b"part1 part2"),
     )))))
     .boxed_unsync();
-    let part = Part::stream(stream);
+    let part = Part::body(stream);
 
     let form = Form::new().text("foo", "bar").part("part_stream", part);
 
