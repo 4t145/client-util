@@ -6,9 +6,8 @@ async fn main() -> client_util::Result<()> {
         .text("key", "value")
         .part("file", Part::bytes(b"hello, world!"));
     let mut client = client_util::client::build_https_client().unwrap();
-    let request = http::Request::post("https://httpbin.org/anything")
+    let request = RequestBuilder::post("https://httpbin.org/anything")?
         .version(http::Version::HTTP_11)
-        .body(())?
         .multipart(form)?;
     let (parts, response) = request
         .send(&mut client)
@@ -16,8 +15,7 @@ async fn main() -> client_util::Result<()> {
         .json::<serde_json::Value>()
         .await?
         .into_parts();
-    println!("{:?}", parts);
+    println!("{parts:?}");
     println!("{}", serde_json::to_string_pretty(&response).unwrap());
-
     Ok(())
 }

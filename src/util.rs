@@ -2,10 +2,7 @@
 pub(crate) const fn ok<U, T, E>(
     map: impl FnOnce(U) -> Result<T, E>,
 ) -> impl FnOnce(U) -> Option<T> {
-    move |u| match map(u) {
-        Ok(t) => Some(t),
-        Err(_) => None,
-    }
+    move |u| map(u).ok()
 }
 
 /// a function wrapper for unreachable! macro

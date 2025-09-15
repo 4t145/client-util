@@ -7,6 +7,9 @@
     ],
     "rust-analyzer.cargo.features": [
         "json",
-        "multipart"
+        "multipart",
+        "form",
+        "io-tokio",
+        "auth"
     ]
 }
