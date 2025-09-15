@@ -29,10 +29,11 @@ pub enum BuildRequestError {
     #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     #[error("failed to serialize json body: {0}")]
     BuildJsonBody(#[from] serde_json::Error),
+    #[cfg(feature = "form")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "form")))]
     #[error("failed to build form body: {0}")]
     BuildForm(#[from] BuildFormError),
     #[cfg(feature = "multipart")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
     #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
     #[error("failed to build multipart body: {0}")]
     BuildMultipart(#[from] BuildMultipartError),
