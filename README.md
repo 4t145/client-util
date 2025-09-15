@@ -12,12 +12,12 @@ cargo add client-util
 
 ### Make it easier to use hyper http client
 ```rust
-use client_util::prelude::{RequestBuilderExt, RequestExt, ResponseExt, build_https_client};
+use client_util::prelude::*;
 #[tokio::main]
 async fn main() -> client_util::Result<()> {
     let mut client = build_https_client().expect("fail to build client");
 
-    let request = http::Request::get("https://httpbin.org/json")
+    let request = RequestBuilder::get("https://httpbin.org/json")?
         .version(http::Version::HTTP_11)
         .json("hello client-util")?;
 
@@ -57,11 +57,5 @@ We have [`tower-cookie`](https://crates.io/crates/tower-cookies)
 |multipart                      |multipart form body                        |
 |query                          |serialize into and append url's query      |
 |auth                           |method to append auth header               |
-|decompression-deflate          |deflate decompression, need tokio runtime  |
-|decompression-gzip             |gzip decompression, need tokio runtime     |
-|decompression-br               |br decompression, need tokio runtime       |
-|decompression-zstd             |zstd decompression, need tokio runtime     |
-|decompression-all              |all decompression support upon             |
 |hyper-client                   |shortcut to create a hyper http client     |
 |hyper-client-rustls            |hyper-client with rustls                   |
-|rt-tokio                       |run with tokio runtime, which allows you use [`tower-http`](./https://docs.rs/tower-http/latest/tower_http/) |

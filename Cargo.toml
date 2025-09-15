@@ -1,6 +1,6 @@
 [package]
 name = "client-util"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["4t145<u4t145@163.com>"]
 description = "Help you to build requests and handle responses by several extension trait!"
@@ -9,6 +9,10 @@ license = "Apache-2.0"
 keywords = ["http", "tower", "hyper", "client", "middleware"]
 categories = ["asynchronous", "network-programming"]
 readme = "README.md"
+
+[package.metadata.docs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 
@@ -63,15 +67,11 @@ tokio-util = { version = "0.7", optional = true }
 thiserror = "2.0.16"
 [features]
 default = [
-    "rt-tokio",
     "client-hyper",
     "client-hyper-rustls",
     "json",
     "query",
     "stream",
-    "decompression-deflate",
-    "decompression-gzip",
-    "decompression-br",
 ]
 
 futures-util = ["dep:futures-util"]
@@ -105,26 +105,11 @@ auth = ["base64"]
 percent-encoding = ["dep:percent-encoding"]
 form = ["serde_urlencoded"]
 
-# decompression support
-decompression-all = [
-    "decompression-deflate",
-    "decompression-gzip",
-    "decompression-br",
-    "decompression-zstd",
-]
-decompression-deflate = ["tower-http/decompression-deflate"]
-decompression-gzip = ["tower-http/decompression-gzip"]
-decompression-br = ["tower-http/decompression-br"]
-decompression-zstd = ["tower-http/decompression-zstd"]
-
 # charset decoding
 charset = ["encoding_rs"]
 
 # io extension
 io-tokio = ["tokio/io-util", "tokio-util/io"]
-
-# Runtime
-rt-tokio = ["dep:tower-http"]
 
 # full
 full = ["client-hyper", "client-hyper-rustls", "form", "json", "query", "auth", "multipart"]
@@ -140,7 +125,7 @@ hyper-util = { version = "0.1", features = [
     "http2",
     "client-legacy",
 ] }
-
+tower = { version = "0.5", features = ["full"] }
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

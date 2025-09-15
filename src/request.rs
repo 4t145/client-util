@@ -1,21 +1,20 @@
 #[cfg(feature = "multipart")]
+#[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
 mod multipart;
 use bytes::Bytes;
-use futures_core::Stream;
-use http::request::Builder;
+use futures_util::TryFutureExt;
 use http::uri::PathAndQuery;
 use http::HeaderValue;
 use http::Request;
 use http::Response;
 use http::{header::CONTENT_TYPE, Uri};
-use http_body_util::StreamBody;
-use http_body_util::{combinators::UnsyncBoxBody, Empty, Full};
+use http_body_util::combinators::BoxBody;
+use http_body_util::{Empty, Full};
 #[cfg(feature = "multipart")]
 pub use multipart::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use std::convert::Infallible;
-use std::error;
 use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -23,21 +22,24 @@ use std::str::FromStr;
 
 use crate::body::{empty, full};
 use crate::client::ClientBody;
-use crate::client::MaybeAbort;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BuildRequestError {
     #[cfg(feature = "json")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     #[error("failed to serialize json body: {0}")]
     BuildJsonBody(#[from] serde_json::Error),
     #[error("failed to build form body: {0}")]
     BuildForm(#[from] BuildFormError),
     #[cfg(feature = "multipart")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
     #[error("failed to build multipart body: {0}")]
     BuildMultipart(#[from] BuildMultipartError),
     #[error("failed to build request path: {0}")]
     BuildPath(#[from] BuildPathError),
     #[cfg(feature = "query")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "query")))]
     #[error("failed to build request query: {0}")]
     BuildQuery(#[from] BuildQueryError),
     #[error("invalid uri: {0}")]
@@ -63,6 +65,7 @@ pub enum BuildPathError {
 }
 
 #[cfg(feature = "query")]
+#[cfg_attr(docsrs, doc(cfg(feature = "query")))]
 #[derive(Debug, thiserror::Error)]
 pub enum BuildQueryError {
     #[error("invalid uri: {0}")]
@@ -74,13 +77,17 @@ pub enum BuildQueryError {
 }
 
 #[cfg(feature = "query")]
+#[cfg_attr(docsrs, doc(cfg(feature = "query")))]
 #[derive(Debug, thiserror::Error)]
 pub enum BuildMultipartError {
     #[error("invalid boundary header: {0}")]
     InvalidBoundaryHeader(#[from] http::header::InvalidHeaderValue),
+    #[error("invalid mime type: {0}")]
+    InvalidMime(#[from] mime::FromStrError),
 }
 
 #[cfg(feature = "form")]
+#[cfg_attr(docsrs, doc(cfg(feature = "form")))]
 #[derive(Debug, thiserror::Error)]
 pub enum BuildFormError {
     #[error("failed to serialize form body: {0}")]
@@ -90,6 +97,7 @@ pub enum BuildFormError {
 }
 
 #[cfg(feature = "json")]
+#[cfg_attr(docsrs, doc(cfg(feature = "json")))]
 #[derive(Debug, thiserror::Error)]
 pub enum BuildJsonBodyError {
     #[error("failed to serialize json body: {0}")]
@@ -127,6 +135,12 @@ macro_rules! http_methods {
     };
 }
 
+impl Default for RequestBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RequestBuilder {
     pub fn new() -> Self {
         let (parts, _) = http::Request::new(()).into_parts();
@@ -154,9 +168,17 @@ impl RequestBuilder {
         self.parts.version = version;
         self
     }
+    pub fn body<B>(self, body: B) -> Result<Request<B>, BuildRequestError>
+    where
+        B: http_body::Body<Data = Bytes> + Send + Sync + 'static,
+        B::Error: Into<crate::error::BoxError>,
+    {
+        let request = Request::from_parts(self.parts, body);
+        Ok(request)
+    }
     #[cfg(feature = "json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
-    fn json<T: Serialize + ?Sized>(
+    pub fn json<T: Serialize + ?Sized>(
         self,
         body: &T,
     ) -> Result<Request<Full<Bytes>>, BuildRequestError> {
@@ -171,7 +193,7 @@ impl RequestBuilder {
     }
     #[cfg(feature = "multipart")]
     #[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
-    fn multipart(
+    pub fn multipart(
         self,
         mut form: multipart::Form,
     ) -> Result<Request<crate::Body>, BuildRequestError> {
@@ -199,7 +221,7 @@ impl RequestBuilder {
     /// Set the request body as form data.
     #[cfg(feature = "form")]
     #[cfg_attr(docsrs, doc(cfg(feature = "form")))]
-    fn form<T: Serialize + ?Sized>(
+    pub fn form<T: Serialize + ?Sized>(
         mut self,
         form: &T,
     ) -> Result<Request<Full<Bytes>>, BuildRequestError> {
@@ -210,28 +232,28 @@ impl RequestBuilder {
         );
         Ok(Request::from_parts(self.parts, full(body)))
     }
-    fn plain_text(self, body: impl Into<Bytes>) -> Request<Full<Bytes>> {
+    pub fn plain_text(self, body: impl Into<Bytes>) -> Request<Full<Bytes>> {
         Request::from_parts(self.parts, full(body))
     }
-    fn empty(self) -> Request<Empty<Bytes>> {
+    pub fn empty(self) -> Request<Empty<Bytes>> {
         Request::from_parts(self.parts, empty())
     }
     #[cfg(feature = "query")]
     #[cfg_attr(docsrs, doc(cfg(feature = "query")))]
-    fn query<Q: Serialize + ?Sized>(mut self, query: &Q) -> Result<Self, BuildRequestError> {
+    pub fn query<Q: Serialize + ?Sized>(mut self, query: &Q) -> Result<Self, BuildRequestError> {
         self.parts.uri = build_query_uri(self.parts.uri, query)?;
         Ok(self)
     }
-    fn path(mut self, path: impl AsRef<str>) -> Result<Self, BuildRequestError> {
+    pub fn path(mut self, path: impl AsRef<str>) -> Result<Self, BuildRequestError> {
         let path = path.as_ref();
         self.parts.uri = build_path_uri(self.parts.uri, path)?;
         Ok(self)
     }
-    fn headers(mut self, header_map: http::header::HeaderMap) -> Self {
+    pub fn headers(mut self, header_map: http::header::HeaderMap) -> Self {
         self.parts.headers.extend(header_map);
         self
     }
-    fn header<V>(
+    pub fn header<V>(
         mut self,
         key: impl http::header::IntoHeaderName,
         value: V,
@@ -246,7 +268,8 @@ impl RequestBuilder {
         Ok(self)
     }
     #[cfg(feature = "auth")]
-    fn basic_auth<U, P>(self, username: U, password: Option<P>) -> Self
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
+    pub fn basic_auth<U, P>(self, username: U, password: Option<P>) -> Self
     where
         U: std::fmt::Display,
         P: std::fmt::Display,
@@ -257,7 +280,8 @@ impl RequestBuilder {
             .expect("base64 should always be a valid header value")
     }
     #[cfg(feature = "auth")]
-    fn bearer_auth<T>(self, token: T) -> Self
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
+    pub fn bearer_auth<T>(self, token: T) -> Self
     where
         T: std::fmt::Display,
     {
@@ -297,40 +321,14 @@ pub trait RequestExt<B>: Sized {
         self.with_header(http::header::AUTHORIZATION, header_value)
     }
 
-    // fn send<S, R>(self, client: S) -> impl Future<Output = crate::Result<S::Response>> + Send
-    // where
-    //     B: http_body::Body<Data = Bytes> + Send + 'static,
-    //     B::Error: std::error::Error + Send + Sync,
-    //     S: tower_service::Service<Request<ClientBody>, Response = Response<R>> + Send,
-    //     R: http_body::Body,
-    //     <S as tower_service::Service<Request<ClientBody>>>::Error:
-    //         std::error::Error + Send + Sync + 'static,
-    //     <S as tower_service::Service<Request<ClientBody>>>::Future: Send;
-
-    // #[cfg(feature = "rt-tokio")]
-    // #[cfg_attr(docsrs, doc(cfg(feature = "rt-tokio")))]
-    // /// Send the request to a service with a timeout layer.
-    // fn send_timeout<S, R>(
-    //     self,
-    //     client: S,
-    //     timeout: std::time::Duration,
-    // ) -> impl Future<Output = crate::Result<Response<MaybeAbort<R>>>> + Send
-    // where
-    //     B: http_body::Body<Data = Bytes> + Send + 'static,
-    //     B::Error: std::error::Error + Send + Sync,
-    //     S: tower_service::Service<Request<ClientBody>, Response = Response<R>> + Send,
-    //     <S as tower_service::Service<Request<ClientBody>>>::Error:
-    //         std::error::Error + Send + Sync + 'static,
-    //     <S as tower_service::Service<Request<ClientBody>>>::Future: Send,
-    //     R: http_body::Body,
-    //     Self: Sized,
-    // {
-    //     use tower::util::ServiceExt;
-    //     self.send(tower_http::timeout::Timeout::new(
-    //         client.map_response(|r| r.map(MaybeAbort::success)),
-    //         timeout,
-    //     ))
-    // }
+    fn send<S, R>(self, client: S) -> impl Future<Output = crate::Result<S::Response>> + Send
+    where
+        B: http_body::Body<Data = Bytes> + Send + Sync + 'static,
+        B::Error: Into<crate::error::BoxError>,
+        S: tower_service::Service<Request<ClientBody>, Response = Response<R>> + Send + Sync,
+        R: http_body::Body + Send + Sync + 'static,
+        <S as tower_service::Service<Request<ClientBody>>>::Error: Into<crate::error::BoxError>,
+        <S as tower_service::Service<Request<ClientBody>>>::Future: Send;
 }
 
 impl<B> RequestExt<B> for Request<B>
@@ -380,67 +378,29 @@ where
         self
     }
 
-    // /// Send the request to a service.
-    // ///
-    // /// If you enabled any decompression feature, the response body will be automatically decompressed.
-    // #[allow(unused_mut)]
-    // async fn send<S, R>(self, mut client: S) -> crate::Result<S::Response>
-    // where
-    //     B: http_body::Body<Data = Bytes> + Send + 'static,
-    //     B::Error: std::error::Error + Send + Sync,
-    //     S: tower_service::Service<Request<ClientBody>, Response = Response<R>> + Send,
-    //     R: http_body::Body,
-    //     <S as tower_service::Service<Request<ClientBody>>>::Error:
-    //         std::error::Error + Send + Sync + 'static,
-    //     <S as tower_service::Service<Request<ClientBody>>>::Future: Send,
-    // {
-    //     use http_body_util::BodyExt;
-    //     #[allow(unused_imports)]
-    //     use tower_service::Service;
-    //     #[cfg(all(
-    //         any(
-    //             feature = "decompression-deflate",
-    //             feature = "decompression-gzip",
-    //             feature = "decompression-br",
-    //             feature = "decompression-zstd",
-    //         ),
-    //         feature = "rt-tokio"
-    //     ))]
-    //     let mut client = tower_http::decompression::Decompression::new(client);
-    //     let request = self.map(|b| UnsyncBoxBody::new(b.map_err(|e| BodyError(Box::new(e)))));
-    //     match client.call(request).await {
-    //         #[cfg(all(
-    //             any(
-    //                 feature = "decompression-deflate",
-    //                 feature = "decompression-gzip",
-    //                 feature = "decompression-br",
-    //                 feature = "decompression-zstd",
-    //             ),
-    //             feature = "rt-tokio"
-    //         ))]
-    //         Ok(response) => Ok(response.map(|b| b.into_inner())),
-    //         #[cfg(not(all(
-    //             any(
-    //                 feature = "decompression-deflate",
-    //                 feature = "decompression-gzip",
-    //                 feature = "decompression-br",
-    //                 feature = "decompression-zstd",
-    //             ),
-    //             feature = "rt-tokio"
-    //         )))]
-    //         Ok(response) => Ok(response),
-    //         Err(e) => {
-    //             let e = ClientError::from(e);
-    //             Err(crate::Error::new(
-    //                 crate::ErrorKind::Client(e),
-    //                 "send request",
-    //             ))
-    //         }
-    //     }
-    // }
+    /// Send the request to a service.
+    ///
+    /// If you enabled any decompression feature, the response body will be automatically decompressed.
+    #[allow(unused_mut)]
+    fn send<S, R>(self, mut client: S) -> impl Future<Output = crate::Result<S::Response>> + Send
+    where
+        B: http_body::Body<Data = Bytes> + Send + Sync + 'static,
+        B::Error: Into<crate::error::BoxError>,
+        S: tower_service::Service<Request<ClientBody>, Response = Response<R>> + Send + Sync,
+        R: http_body::Body + Send + Sync + 'static,
+        <S as tower_service::Service<Request<ClientBody>>>::Error: Into<crate::error::BoxError>,
+        <S as tower_service::Service<Request<ClientBody>>>::Future: Send,
+    {
+        use http_body_util::BodyExt;
+        let request = self.map(|b| BoxBody::new(b.map_err(|e| e.into())));
+        client
+            .call(request)
+            .map_err(|e| crate::Error::SendRequest(e.into()))
+    }
 }
 
 #[cfg(feature = "query")]
+#[cfg_attr(docsrs, doc(cfg(feature = "query")))]
 fn build_query_uri<Q: Serialize + ?Sized>(uri: Uri, query: &Q) -> Result<Uri, BuildQueryError> {
     use std::str::FromStr;
     let new_query = serde_urlencoded::to_string(query)?;
@@ -457,8 +417,8 @@ fn build_query_uri<Q: Serialize + ?Sized>(uri: Uri, query: &Q) -> Result<Uri, Bu
             new_pq_string.push('&');
         }
         new_pq_string.push_str(&new_query);
-        let new_pq = http::uri::PathAndQuery::from_str(&new_pq_string)?;
-        new_pq
+
+        http::uri::PathAndQuery::from_str(&new_pq_string)?
     } else {
         http::uri::PathAndQuery::from_str(&new_query)?
     };
@@ -475,7 +435,7 @@ fn build_path_uri(uri: Uri, path: &str) -> Result<Uri, BuildPathError> {
     };
     let query = pq.query();
     let pq = if let Some(query) = query {
-        PathAndQuery::from_maybe_shared(format!("{}?{}", path, query))?
+        PathAndQuery::from_maybe_shared(format!("{path}?{query}"))?
     } else {
         PathAndQuery::from_str(path)?
     };
@@ -571,6 +531,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "auth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
     fn test_basic_auth_sensitive_header() -> crate::Result<()> {
         let some_url = "https://localhost/";
 
@@ -589,6 +550,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "auth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "auth")))]
     fn test_bearer_auth_sensitive_header() -> crate::Result<()> {
         let some_url = "https://localhost/";
 

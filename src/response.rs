@@ -4,7 +4,6 @@ use std::future::Future;
 use std::sync::Arc;
 
 use crate::util::ok;
-use crate::Error;
 use bytes::Buf;
 use bytes::Bytes;
 use http::header::CONTENT_TYPE;
@@ -21,18 +20,36 @@ use std::str::FromStr;
 pub trait ResponseExt<B>: Sized {
     #[cfg(feature = "json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
-    fn json<T: DeserializeOwned>(self) -> impl Future<Output = crate::Result<Response<T>>> + Send;
-    fn text(self) -> impl Future<Output = crate::Result<Response<String>>> + Send;
-    fn bytes(self) -> impl Future<Output = crate::Result<Response<Bytes>>> + Send;
+    fn json<T: DeserializeOwned>(
+        self,
+    ) -> impl Future<Output = Result<Response<T>, ResponseError>> + Send;
+    fn text(self) -> impl Future<Output = Result<Response<String>, ResponseError>> + Send;
+    fn bytes(self) -> impl Future<Output = Result<Response<Bytes>, ResponseError>> + Send;
     fn data_stream(self) -> Response<BodyDataStream<B>>;
-    fn buffer(self) -> impl Future<Output = crate::Result<Response<impl Buf>>> + Send;
+    fn buffer(self) -> impl Future<Output = Result<Response<impl Buf>, ResponseError>> + Send;
     #[cfg(feature = "hyper")]
     #[cfg_attr(docsrs, doc(cfg(feature = "hyper")))]
-    fn hyper_upgrade(self) -> impl Future<Output = crate::Result<hyper::upgrade::Upgraded>> + Send;
+    fn hyper_upgrade(
+        self,
+    ) -> impl Future<Output = Result<hyper::upgrade::Upgraded, ResponseError>> + Send;
 }
 
 pub type TextDecodeFn = fn(Vec<u8>) -> Result<String, Box<dyn std::error::Error + Send>>;
 
+#[derive(Debug, thiserror::Error)]
+pub enum ResponseError {
+    #[error("collect body error: {0}")]
+    CollectBody(#[source] Box<dyn std::error::Error + Send>),
+    #[cfg(feature = "json")]
+    #[error("json deserialize error: {0}")]
+    JsonDeserialize(#[from] serde_json::Error),
+    #[error("text decode error for charset {charset}: {error}")]
+    TextDecode {
+        #[source]
+        error: Box<dyn std::error::Error + Send>,
+        charset: String,
+    },
+}
 /// A collection of text decoders.
 #[derive(Debug, Default, Clone)]
 pub struct Decoders {
@@ -56,16 +73,16 @@ where
     /// Deserialize the response body as json.
     #[cfg(feature = "json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
-    async fn json<T: DeserializeOwned>(self) -> crate::Result<Response<T>> {
+    async fn json<T: DeserializeOwned>(self) -> Result<Response<T>, ResponseError> {
         use bytes::Buf;
         let (parts, body) = self.into_parts();
         let body = body
             .collect()
             .await
-            .map_err(Error::custom_with_context("collecting body stream"))?
+            .map_err(|e| ResponseError::CollectBody(Box::new(e)))?
             .aggregate();
         let body = serde_json::from_reader::<_, T>(body.reader())
-            .map_err(Error::custom_with_context("deserialize json body"))?;
+            .map_err(ResponseError::JsonDeserialize)?;
         Ok(Response::from_parts(parts, body))
     }
 
@@ -74,13 +91,13 @@ where
     /// This function will try to decode the body with the charset specified in the `Content-Type` header.
     ///
     /// In most cases, the charset is `utf-8`. If the charset is not `utf-8`, you should enable the `charset` feature.
-    async fn text(self) -> crate::Result<Response<String>> {
+    async fn text(self) -> Result<Response<String>, ResponseError> {
         use mime::Mime;
         let (parts, body) = self.into_parts();
         let body = body
             .collect()
             .await
-            .map_err(Error::custom_with_context("collecting body stream"))?
+            .map_err(|e| ResponseError::CollectBody(Box::new(e)))?
             .to_bytes();
         let mut string_body: Option<String> = None;
         'decode: {
@@ -110,16 +127,22 @@ where
                 let Some(decoder_fn) = decoders.inner.get(custom_charset.as_str()) else {
                     break 'decode;
                 };
-                string_body = Some(
-                    (decoder_fn)(body.to_vec()).map_err(Error::with_context("decode text body"))?,
-                );
+                string_body = Some((decoder_fn)(body.to_vec()).map_err(|error| {
+                    ResponseError::TextDecode {
+                        error,
+                        charset: custom_charset.to_string(),
+                    }
+                })?);
             }
         }
 
         let string_body = match string_body {
             Some(string_body) => string_body,
             None => {
-                String::from_utf8(body.to_vec()).map_err(Error::with_context("decode text body"))?
+                String::from_utf8(body.to_vec()).map_err(|error| ResponseError::TextDecode {
+                    error: Box::new(error),
+                    charset: mime::TEXT_PLAIN_UTF_8.to_string(),
+                })?
             }
         };
 
@@ -135,12 +158,12 @@ where
     }
 
     /// Collect the response body as bytes.
-    async fn bytes(self) -> crate::Result<Response<Bytes>> {
+    async fn bytes(self) -> Result<Response<Bytes>, ResponseError> {
         let (parts, body) = self.into_parts();
         let body = body
             .collect()
             .await
-            .map_err(Error::custom_with_context("collecting body stream"))?
+            .map_err(|error| ResponseError::CollectBody(Box::new(error)))?
             .to_bytes();
         Ok(Response::from_parts(parts, body))
     }
@@ -148,12 +171,12 @@ where
     /// Collect the response body as buffer.
     ///
     /// This function is useful when you want to deserialize the body in various ways.
-    async fn buffer(self) -> crate::Result<Response<impl Buf>> {
+    async fn buffer(self) -> Result<Response<impl Buf>, ResponseError> {
         let (parts, body) = self.into_parts();
         let body = body
             .collect()
             .await
-            .map_err(Error::custom_with_context("collecting body stream"))?
+            .map_err(|error| ResponseError::CollectBody(Box::new(error)))?
             .aggregate();
         Ok(Response::from_parts(parts, body))
     }
@@ -163,9 +186,9 @@ where
     /// Upgrade the connection to a different protocol with hyper.
     ///
     /// This function yield a asynchronous io. You can use this to create a websocket connection by using some websocket lib.
-    async fn hyper_upgrade(self) -> crate::Result<hyper::upgrade::Upgraded> {
+    async fn hyper_upgrade(self) -> Result<hyper::upgrade::Upgraded, ResponseError> {
         hyper::upgrade::on(self)
             .await
-            .map_err(Error::with_context("upgrade connection"))
+            .map_err(|error| ResponseError::CollectBody(Box::new(error)))
     }
 }

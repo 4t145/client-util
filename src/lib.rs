@@ -13,9 +13,8 @@
     clippy::needless_borrow,
     clippy::match_wildcard_for_single_variants,
     clippy::if_let_mutex,
-    clippy::mismatched_target_os,
+    unexpected_cfgs,
     clippy::await_holding_lock,
-    clippy::match_on_vec_items,
     clippy::imprecise_flops,
     clippy::suboptimal_flops,
     clippy::lossy_float_literal,
@@ -36,7 +35,8 @@ pub mod client;
 pub mod error;
 pub mod request;
 pub mod response;
-pub mod api;
+
+// pub mod api;
 mod util;
 
 pub use body::{empty, full, Body};
